@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Word Karaoke Video Generator v2</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #101114;
+        color: #eee;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      .wrap {
+        max-width: 1180px;
+        margin: auto;
+        padding: 24px;
+      }
+      h1 {
+        margin: 0 0 8px;
+      }
+      .desc {
+        color: #aaa;
+        margin-bottom: 18px;
+      }
+      textarea {
+        width: 100%;
+        height: 180px;
+        resize: vertical;
+        background: #1b1d22;
+        color: #fff;
+        border: 1px solid #3a3d45;
+        border-radius: 12px;
+        padding: 14px;
+        font-size: 18px;
+        line-height: 1.5;
+      }
+      .controls {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 12px;
+        margin: 16px 0;
+      }
+      .control {
+        background: #191b20;
+        border: 1px solid #30333b;
+        border-radius: 10px;
+        padding: 10px;
+      }
+      .control label {
+        display: block;
+        font-size: 13px;
+        color: #aaa;
+        margin-bottom: 7px;
+      }
+      input[type="number"] {
+        width: 100%;
+        padding: 8px;
+        background: #111318;
+        color: #fff;
+        border: 1px solid #444;
+        border-radius: 7px;
+      }
+      input[type="color"] {
+        width: 100%;
+        height: 38px;
+        padding: 2px;
+        background: #111318;
+        border: 1px solid #444;
+        border-radius: 7px;
+      }
+      select {
+        width: 100%;
+        height: 38px;
+        padding: 6px;
+        background: #111318;
+        color: #fff;
+        border: 1px solid #444;
+        border-radius: 7px;
+      }
+      button {
+        border: 0;
+        border-radius: 9px;
+        padding: 12px 18px;
+        font-weight: bold;
+        cursor: pointer;
+      }
+      #generate {
+        background: #39d98a;
+        color: #06140c;
+      }
+      #download {
+        background: #4da3ff;
+        color: #07121e;
+      }
+      button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .buttons {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+      }
+      .preview {
+        background: #000;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 0 0 1px #292c33;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .status {
+        min-height: 44px;
+        padding: 12px 2px;
+        color: #aaa;
+        white-space: pre-wrap;
+      }
+      video {
+        width: 100%;
+        margin-top: 12px;
+        border-radius: 12px;
+        background: #000;
+        display: none;
+      }
+      .note {
+        font-size: 13px;
+        color: #888;
+        line-height: 1.5;
+        margin-top: 12px;
+      }
+      .progress {
+        height: 7px;
+        background: #282b32;
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .progress > div {
+        height: 100%;
+        width: 0%;
+        background: #39d98a;
+        transition: width 0.05s linear;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Word Karaoke Video Generator</h1>
+      <div class="desc">Tạo hiệu ứng từng từ xuất hiện tuần tự và ghi thành video.</div>
+
+      <textarea id="text">
+Xin chào! Đây là hiệu ứng chữ chạy theo từng từ. Mỗi từ sẽ được làm nổi bật lần lượt, tạo cảm giác giống chữ chạy theo lời nói.</textarea
+      >
+
+      <div class="controls">
+        <div class="control">
+          <label>Thời gian mỗi từ (ms)</label><input id="wordMs" type="number" min="80" value="350" />
+        </div>
+        <div class="control">
+          <label>Nghỉ giữa câu (ms)</label><input id="pauseMs" type="number" min="0" value="500" />
+        </div>
+        <div class="control">
+          <label>FPS ghi video</label><input id="fps" type="number" min="24" max="60" value="60" />
+        </div>
+        <div class="control">
+          <label>Cỡ chữ (px)</label><input id="fontSize" type="number" min="20" max="150" value="54" />
+        </div>
+        <div class="control"><label>Màu nền</label><input id="bg" type="color" value="#000000" /></div>
+        <div class="control"><label>Màu chữ</label><input id="fg" type="color" value="#ffffff" /></div>
+        <div class="control">
+          <label>Màu nền từ đang đọc</label><input id="activeBg" type="color" value="#22c55e" />
+        </div>
+        <div class="control">
+          <label>Màu chữ từ đang đọc</label><input id="activeFg" type="color" value="#000000" />
+        </div>
+        <div class="control">
+          <label>Ảnh nền</label>
+          <input id="bgImage" type="file" accept="image/*" />
+        </div>
+        <div class="control">
+          <label>Vị trí vùng chữ</label>
+          <select id="textPosition">
+            <option value="top-left">Trên trái</option>
+            <option value="top-center">Trên giữa</option>
+            <option value="top-right">Trên phải</option>
+            <option value="center-left">Giữa trái</option>
+            <option value="center">Chính giữa</option>
+            <option value="center-right">Giữa phải</option>
+            <option value="bottom-left">Dưới trái</option>
+            <option value="bottom-center">Dưới giữa</option>
+            <option value="bottom-right">Dưới phải</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="buttons">
+        <button id="generate">Generate & Record</button>
+        <button id="download" disabled>Tải video</button>
+      </div>
+
+      <div class="progress"><div id="progress"></div></div>
+      <div id="status" class="status">Sẵn sàng.</div>
+
+      <div class="preview">
+        <canvas id="canvas" width="1920" height="1080"></canvas>
+      </div>
+
+      <video id="video" controls></video>
+
+      <!-- <div class="note">
+        Khuyến nghị Chrome/Edge mới. Nếu trình duyệt không hỗ trợ MP4 trực tiếp, video sẽ được tạo ở WebM. Phiên bản này
+        không dùng setTimeout để quyết định frame animation; thời điểm hiển thị từng từ được tính từ đồng hồ thực.
+      </div> -->
+    </div>
+
+    <script>
+      (() => {
+        "use strict";
+
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d", { alpha: false });
+        const textEl = document.getElementById("text");
+        const generateBtn = document.getElementById("generate");
+        const downloadBtn = document.getElementById("download");
+        const videoEl = document.getElementById("video");
+        const statusEl = document.getElementById("status");
+        const progressEl = document.getElementById("progress");
+
+        let currentURL = null;
+        let generating = false;
+        let backgroundImage = null;
+        let backgroundImageURL = null;
+
+        const bgImageEl = document.getElementById("bgImage");
+
+        bgImageEl.addEventListener("change", () => {
+          const file = bgImageEl.files?.[0];
+
+          if (!file) {
+            backgroundImage = null;
+            drawBlank();
+            return;
+          }
+
+          if (backgroundImageURL) {
+            URL.revokeObjectURL(backgroundImageURL);
+          }
+
+          backgroundImageURL = URL.createObjectURL(file);
+          const image = new Image();
+
+          image.onload = () => {
+            backgroundImage = image;
+            drawBlank();
+          };
+
+          image.src = backgroundImageURL;
+        });
+
+        function drawBackground() {
+          if (!backgroundImage) {
+            ctx.fillStyle = document.getElementById("bg").value;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            return;
+          }
+
+          const scale = Math.max(canvas.width / backgroundImage.width, canvas.height / backgroundImage.height);
+
+          const width = backgroundImage.width * scale;
+          const height = backgroundImage.height * scale;
+          const x = (canvas.width - width) / 2;
+          const y = (canvas.height - height) / 2;
+
+          ctx.drawImage(backgroundImage, x, y, width, height);
+
+          // Lớp phủ tối nhẹ để chữ dễ đọc hơn.
+          ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function getSentences(text) {
+          text = text.replace(/\s+/g, " ").trim();
+          if (!text) return [];
+          // Giữ dấu câu cuối câu.
+          const m = text.match(/[^.!?。！？]+[.!?。！？]+|[^.!?。！？]+$/g);
+          return (m || []).map((s) => s.trim()).filter(Boolean);
+        }
+
+        function getWords(sentence) {
+          return sentence.match(/\S+/g) || [];
+        }
+
+        function getMime() {
+          const list = [
+            'video/mp4;codecs="avc1.42E01E,mp4a.40.2"',
+            "video/mp4;codecs=avc1",
+            "video/webm;codecs=vp9",
+            "video/webm;codecs=vp8",
+            "video/webm",
+          ];
+          for (const type of list) {
+            if (MediaRecorder.isTypeSupported(type)) return type;
+          }
+          return "";
+        }
+
+        function drawFrame(words, activeIndex) {
+          const fg = document.getElementById("fg").value;
+          const activeBg = document.getElementById("activeBg").value;
+          const activeFg = document.getElementById("activeFg").value;
+          const size = Math.max(20, Math.min(150, Number(document.getElementById("fontSize").value) || 54));
+
+          drawBackground();
+
+          ctx.font = `600 ${size}px Arial, Helvetica, sans-serif`;
+          ctx.textBaseline = "middle";
+          ctx.textAlign = "left";
+
+          // Tự xuống dòng nếu câu quá dài.
+          const gap = Math.max(12, size * 0.3);
+          const maxWidth = canvas.width * 0.86;
+
+          let lines = [];
+          let line = [];
+          let lineWidth = 0;
+
+          words.forEach((word, index) => {
+            const w = ctx.measureText(word).width;
+            const candidate = line.length ? lineWidth + gap + w : w;
+            if (line.length && candidate > maxWidth) {
+              lines.push(line);
+              line = [{ word, index, width: w }];
+              lineWidth = w;
+            } else {
+              line.push({ word, index, width: w });
+              lineWidth = candidate;
+            }
+          });
+          if (line.length) lines.push(line);
+
+          const lineHeight = size * 1.55;
+          const totalHeight = lines.length * lineHeight;
+          const position = document.getElementById("textPosition").value;
+          const [vertical, horizontal] = position.split("-");
+
+          const sideMargin = canvas.width * 0.07;
+
+          let firstY;
+          if (vertical === "top") {
+            firstY = canvas.height * 0.14 + lineHeight / 2;
+          } else if (vertical === "bottom") {
+            firstY = canvas.height - canvas.height * 0.14 - totalHeight + lineHeight / 2;
+          } else {
+            firstY = (canvas.height - totalHeight) / 2 + lineHeight / 2;
+          }
+
+          let y = firstY;
+
+          lines.forEach((items) => {
+            const width = items.reduce((sum, item) => sum + item.width, 0) + gap * Math.max(0, items.length - 1);
+
+            let x;
+            if (horizontal === "left") {
+              x = sideMargin;
+            } else if (horizontal === "right") {
+              x = canvas.width - sideMargin - width;
+            } else {
+              x = (canvas.width - width) / 2;
+            }
+
+            items.forEach((item) => {
+              if (item.index === activeIndex) {
+                ctx.fillStyle = activeBg;
+                ctx.fillRect(x - size * 0.2, y - size * 0.72, item.width + size * 0.4, size * 1.44);
+                ctx.fillStyle = activeFg;
+              } else {
+                ctx.fillStyle = fg;
+              }
+
+              ctx.fillText(item.word, x, y);
+              x += item.width + gap;
+            });
+
+            y += lineHeight;
+          });
+        }
+
+        function drawBlank() {
+          drawBackground();
+        }
+
+        drawBlank();
+
+        function sleep(ms) {
+          return new Promise((resolve) => setTimeout(resolve, ms));
+        }
+
+        function waitForNextFrame() {
+          return new Promise((resolve) => requestAnimationFrame(resolve));
+        }
+
+        async function animateWord(words, index, duration, startedAt) {
+          // Frame đầu tiên được vẽ ngay khi từ bắt đầu.
+          drawFrame(words, index);
+          await waitForNextFrame();
+
+          // Dùng timestamp thực, không dùng setTimeout để chuyển frame.
+          while (true) {
+            const now = performance.now();
+            const elapsed = now - startedAt;
+            const ratio = Math.min(1, elapsed / duration);
+
+            // Từ vẫn giữ nguyên trong toàn bộ khoảng thời gian của nó.
+            drawFrame(words, index);
+
+            if (ratio >= 1) break;
+            await waitForNextFrame();
+          }
+        }
+
+        async function renderVideo() {
+          if (generating) return;
+
+          const sentences = getSentences(textEl.value);
+          if (!sentences.length) {
+            alert("Hãy nhập văn bản.");
+            return;
+          }
+
+          if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) {
+            alert("Trình duyệt không hỗ trợ MediaRecorder/captureStream. Hãy dùng Chrome hoặc Edge mới.");
+            return;
+          }
+
+          const mime = getMime();
+          if (!mime) {
+            alert("Không tìm thấy định dạng video được trình duyệt hỗ trợ.");
+            return;
+          }
+
+          generating = true;
+          generateBtn.disabled = true;
+          downloadBtn.disabled = true;
+          videoEl.style.display = "none";
+          progressEl.style.width = "0%";
+
+          if (currentURL) {
+            URL.revokeObjectURL(currentURL);
+            currentURL = null;
+          }
+
+          const wordMs = Math.max(80, Number(document.getElementById("wordMs").value) || 350);
+          const pauseMs = Math.max(0, Number(document.getElementById("pauseMs").value) || 500);
+          const fps = Math.max(24, Math.min(60, Number(document.getElementById("fps").value) || 60));
+
+          const totalWords = sentences.reduce((n, s) => n + getWords(s).length, 0);
+          const totalDuration = totalWords * wordMs + sentences.length * pauseMs;
+          let completedWords = 0;
+
+          const stream = canvas.captureStream(fps);
+          const chunks = [];
+
+          let recorder;
+          try {
+            recorder = new MediaRecorder(stream, {
+              mimeType: mime,
+              videoBitsPerSecond: 9000000,
+            });
+          } catch (e) {
+            recorder = new MediaRecorder(stream, { mimeType: mime });
+          }
+
+          recorder.ondataavailable = (e) => {
+            if (e.data && e.data.size) chunks.push(e.data);
+          };
+
+          const stopped = new Promise((resolve) => {
+            recorder.addEventListener("stop", resolve, { once: true });
+          });
+
+          recorder.start(1000);
+
+          const renderStart = performance.now();
+
+          for (let si = 0; si < sentences.length; si++) {
+            const words = getWords(sentences[si]);
+
+            for (let wi = 0; wi < words.length; wi++) {
+              const wordStart = performance.now();
+
+              await animateWord(words, wi, wordMs, wordStart);
+
+              completedWords++;
+              const pct = Math.round((completedWords / totalWords) * 100);
+              progressEl.style.width = pct + "%";
+              statusEl.textContent = `Đang ghi video...\nCâu ${si + 1}/${sentences.length} — từ ${wi + 1}/${words.length} — ${pct}%`;
+            }
+
+            // Giữ frame cuối câu bằng animation frame thay vì setTimeout.
+            drawFrame(words, -1);
+            const pauseStart = performance.now();
+            while (performance.now() - pauseStart < pauseMs) {
+              drawFrame(words, -1);
+              await waitForNextFrame();
+            }
+          }
+
+          // Giữ một khoảng rất ngắn frame cuối trước khi stop.
+          drawBlank();
+          await waitForNextFrame();
+          await waitForNextFrame();
+
+          recorder.stop();
+          await stopped;
+
+          const blob = new Blob(chunks, { type: mime });
+          currentURL = URL.createObjectURL(blob);
+
+          videoEl.src = currentURL;
+          videoEl.style.display = "block";
+          videoEl.load();
+
+          const extension = mime.includes("mp4") ? "mp4" : "webm";
+
+          downloadBtn.disabled = false;
+          downloadBtn.textContent = `Tải ${extension.toUpperCase()}`;
+
+          downloadBtn.onclick = () => {
+            const a = document.createElement("a");
+            a.href = currentURL;
+            a.download = `word-karaoke-${Date.now()}.${extension}`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+          };
+
+          const seconds = (performance.now() - renderStart) / 1000;
+          progressEl.style.width = "100%";
+          statusEl.textContent = `Hoàn tất!\nĐịnh dạng: ${mime}\nThời gian tạo: ${seconds.toFixed(1)} giây\nSố từ: ${totalWords}`;
+
+          stream.getTracks().forEach((t) => t.stop());
+          generating = false;
+          generateBtn.disabled = false;
+        }
+
+        generateBtn.addEventListener("click", renderVideo);
+      })();
+    </script>
+  </body>
+</html>
